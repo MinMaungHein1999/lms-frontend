@@ -1,7 +1,11 @@
 <template>
-  <div class="user-form">
+  <button @click="openRegisterForm" class="new-user-btn">New User</button>
+  <div v-if="this.openForm" class="user-form">
+    <button class="close-btn" @click="closeForm">x</button>
     <h1>{{ isEditing ? "Edit User" : "Register User" }}</h1>
-    <form @submit.prevent="submitForm">
+   
+    <form  @submit.prevent="submitForm">
+      
       <div>
         <label for="name">UserName :</label>
         <input type="text" id="name" v-model="user.username" required>
@@ -12,9 +16,19 @@
       </div>
       <div>
         <label for="role">Select Role :</label>
-        <div v-for="role in roles" :key="role.id">
+        <div class="radio-group">
+        <div v-for="role in roles" 
+          :key="role.id" 
+          class="radio-option" 
+          :class="{ selected: user.userRole?.id == role.id}"
+          @click="assignRoleToUser(role.id)">
+          <input type="radio" 
+            :id="role.name" 
+            :value="role.id" 
+            v-model="userRoleId" 
+          required>
           <label :for="role.name">{{role.name}}</label>
-          <input type="radio" :id="role.name" :value="role.id" v-model="user.role_id" required>
+        </div>
         </div>
       </div>
       <div>
@@ -23,6 +37,7 @@
       </div>
       <button type="submit">{{ isEditing ? "Update" : "Register"}}</button>
     </form>
+    
   <p v-if="message">{{ message }}</p>
   </div>
   <table>
@@ -37,24 +52,45 @@
       </tr>
     </thead>
     <tbody>
-      <tr v-for="(user, index) in users" :key="index">
-        <th>{{ user.id }}</th>
-        <td>{{ user.username }}</td>
-        <td>{{ user.email }}</td>
-        <td>{{ user.userRole }}</td>
-        <td>{{ user.address }}</td>
+      <tr v-for="(user_obj, index) in users" :key="index">
+        <th>{{ user_obj.id }}</th>
+        <td>{{ user_obj.userName }}</td>
+        <td>{{ user_obj.email }}</td>
+        <td>{{ user_obj.userRole?.name }}</td>
+        <td>{{ user_obj.address }}</td>
         <td>
-          <a href="#" @click.prevent="editUser(user.id)"> Edit</a>
+          <a href="#" @click.prevent="editUser(user_obj.id)"> Edit</a>&nbsp;
+          <a href="#" @click.prevent="deleteUser(user_obj.id)">Delete</a>
         </td>
       </tr>
     </tbody>
   </table>
+  <div class="pagination">
+    <button @click="prevPage">Previous</button>
+    <span>Page</span>
+    <button @click="nextPage">Next</button>
+  </div>
 </template>
 <script>
 import axios from "axios";
 export default{
   data(){
     return {
+      userRoleId: {
+        get(){
+          return this.user.userRole ? this.user.userRole.id : null;
+        },
+        set(value){
+          if(!this.user.userRole){
+            this.user.userRole = {};
+          }
+          this.user.userRole.id = value;
+        }
+      },
+      totalPages: 0,
+      currentPage: 1,
+      pageSize: 3,
+      openForm: false,
       isEditing: false,
       users: [],
       roles: [],
@@ -62,13 +98,43 @@ export default{
         id: null,
         username: "",
         email: "",
-        role_id: null,
-        address: ""
+        address: "",
+        userRole: {
+          id: null,
+          name: "",
+          description: ""
+        } 
       },
       message: ""
     };
   },
   methods: {
+    prevPage(){
+      if(this.currentPage > 1){
+        this.currentPage--;
+        this.fetchUsers();
+      }
+    },
+    nextPage(){
+      this.currentPage++;
+      this.fetchUsers();
+    },
+    async deleteUser(userId){
+      await axios.delete(`http://localhost:8080/api/users/${userId}`)
+      this.fetchUsers()
+    },
+    closeForm(){
+      this.openForm = false;
+    }
+    ,
+    openRegisterForm(){
+      this.openForm = true;
+    }
+    ,
+    assignRoleToUser(roleId){
+      this.user.userRole = this.user.userRole || {};
+      this.user.userRole.id = roleId;
+    },
     async editUser(selectedId){
       const response = await axios.get(`http://localhost:8080/api/users/${selectedId}`);
       this.user = response.data
@@ -80,22 +146,20 @@ export default{
           username: "",
           email: "",
           address: "",
-          role_id: null,
           userRole: null,
         };
     },
     async fetchRoles(){
       const response = await axios.get("http://localhost:8080/api/roles")
       this.roles = response.data
-      console.log(this.roles)
     },
     async fetchUsers(){
-      const response = await axios.get("http://localhost:8080/api/users")
-      this.users = response.data
+      const response = await axios.get(`http://localhost:8080/api/users?currentPage=${this.currentPage}&pageSize=${this.pageSize}`)
+      this.users = response.data.data
+      this.totalPages = response.data.numberOfPages
     },
     async submitForm(){
       try{
-        this.user.userRole = { id: this.user.role_id };
         if (this.isEditing){
           await axios.put(`http://localhost:8080/api/users/${this.user.id}`, this.user)
           this.message = "User Updated Successfully!"
@@ -147,6 +211,21 @@ input{
   border-radius: 4px;
 }
 
+.pagination {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.pagination button {
+  padding: 8px 15px;
+  margin: 5px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
 label{
   float: left;
   display: block;
@@ -159,5 +238,53 @@ button{
   border: none;
   border-radius: 5px;
   cursor: pointer;
+}
+
+/* Radio Button Styles */
+.radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.radio-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #ccc;
+  padding: 5px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: 0.3s ease;
+}
+
+.radio-option.selected {
+  background-color: #28a745;
+  color: white;
+  border-color: #28a745;
+}
+
+.radio-option input {
+  display: none;
+}
+
+.new-user-btn{
+  background-color: #007bff;
+  margin-bottom: 10px;
+}
+
+.radio-option:hover {
+  border-color: #28a745;
+}
+.close-btn{
+  position: relative;
+  top: 10px;
+  left: 200px;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: red;
 }
 </style>
