@@ -3,7 +3,6 @@
   <div v-if="this.openForm" class="user-form">
     <button class="close-btn" @click="closeForm">x</button>
     <h1>{{ isEditing ? "Edit User" : "Register User" }}</h1>
-   
     <form  @submit.prevent="submitForm">
       
       <div>
@@ -40,6 +39,11 @@
     
   <p v-if="message">{{ message }}</p>
   </div>
+  <div class="user-form">
+    <label for="search">Search Users : </label>
+    <input type="text" id="searchUserName" v-model="searchUserName" placeholder="Search by username"/>
+    <button @click="searchUserByName">Search</button>
+  </div>
   <table>
     <thead>
       <tr>
@@ -67,8 +71,8 @@
   </table>
   <div class="pagination">
     <button @click="prevPage">Previous</button>
-    <span>Page</span>
-    <button @click="nextPage">Next</button>
+    <span>Page {{this.currentPage}}</span>
+    <button @click="nextPage" :disabled="checkNextPage">Next</button>
   </div>
 </template>
 <script>
@@ -87,6 +91,8 @@ export default{
           this.user.userRole.id = value;
         }
       },
+      searchUserName: '',
+      hasNextPage: false,
       totalPages: 0,
       currentPage: 1,
       pageSize: 3,
@@ -114,6 +120,10 @@ export default{
         this.currentPage--;
         this.fetchUsers();
       }
+    },
+    searchUserByName(){
+      this.currentPage = 1;
+      this.fetchUsers();
     },
     nextPage(){
       this.currentPage++;
@@ -154,9 +164,10 @@ export default{
       this.roles = response.data
     },
     async fetchUsers(){
-      const response = await axios.get(`http://localhost:8080/api/users?currentPage=${this.currentPage}&pageSize=${this.pageSize}`)
+      const response = await axios.get(`http://localhost:8080/api/users?currentPage=${this.currentPage}&pageSize=${this.pageSize}&username=${this.searchUserName}`)
       this.users = response.data.data
       this.totalPages = response.data.numberOfPages
+      this.hasNextPage = response.data.hasNextPage
     },
     async submitForm(){
       try{
@@ -173,6 +184,12 @@ export default{
         this.message = "Error creating user. Please try again."
       }
     },
+  },
+  computed: {
+    checkNextPage(){
+      console.log("Hash Next page : ", this.hasNextPage)
+      return !this.hasNextPage
+    }
   },
   mounted() {
     this.fetchUsers();
@@ -269,6 +286,18 @@ button{
   display: none;
 }
 
+.search-form{
+  margin: 20px 0;
+  text-align: center;
+}
+
+.search-form input {
+  width: 200px;
+  padding: 8px;
+  margin-top: 5px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
 .new-user-btn{
   background-color: #007bff;
   margin-bottom: 10px;
